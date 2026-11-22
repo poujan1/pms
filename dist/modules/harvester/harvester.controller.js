@@ -51,5 +51,14 @@ class HarvesterController {
             next(error);
         }
     }
+    static async getSummary(req, res, next) {
+        try {
+            const summary = await harvester_service_1.HarvesterService.getSummary();
+            return (0, apiResponse_1.sendResponse)({ res, data: summary });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.HarvesterController = HarvesterController;

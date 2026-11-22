@@ -49,4 +49,13 @@ export class HarvesterController {
       next(error);
     }
   }
+
+  static async getSummary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const summary = await HarvesterService.getSummary();
+      return sendResponse({ res, data: summary });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

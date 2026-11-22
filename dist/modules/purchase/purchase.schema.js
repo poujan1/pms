@@ -15,5 +15,16 @@ exports.createPurchaseSchema = zod_1.z.object({
     rate: zod_1.z.number().positive('Rate must be positive'),
     rateUnit: zod_1.z.nativeEnum(client_1.RateUnit).default(client_1.RateUnit.KG),
     notes: zod_1.z.string().optional(),
+    harvester: zod_1.z
+        .object({
+        machineId: zod_1.z.string().uuid(),
+        landArea: zod_1.z.string().optional().nullable(),
+        durationMinutes: zod_1.z.number().int().positive('Duration must be greater than 0 minutes'),
+        hourlyRate: zod_1.z.number().positive('Hourly rate must be greater than 0'),
+        chargeHandling: zod_1.z.nativeEnum(client_1.HarvesterChargeHandling).default(client_1.HarvesterChargeHandling.FARMER_DEDUCTION),
+        notes: zod_1.z.string().optional().nullable(),
+    })
+        .optional()
+        .nullable(),
 });
 exports.updatePurchaseSchema = exports.createPurchaseSchema.partial();

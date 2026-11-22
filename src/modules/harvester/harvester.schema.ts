@@ -11,10 +11,14 @@ export const logHarvesterWorkSchema = z.object({
   workDate: z.string().optional().nullable(),
   farmerId: z.string().uuid(),
   machineId: z.string().uuid(),
-  workQuantity: z.number().positive('Work quantity must be greater than 0'),
-  ratePerUnit: z.number().positive('Rate must be greater than 0'),
+  landArea: z.string().optional().nullable(),
+  durationMinutes: z.number().int().positive('Duration in minutes must be > 0').optional().nullable(),
+  hourlyRate: z.number().positive('Hourly rate must be > 0').optional().nullable(),
+  workQuantity: z.number().positive('Work quantity must be > 0').optional().nullable(),
+  ratePerUnit: z.number().positive('Rate must be > 0').optional().nullable(),
   chargeHandling: z.nativeEnum(HarvesterChargeHandling),
-  notes: z.string().optional(),
+  purchaseId: z.string().uuid().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 export type CreateMachineInput = z.infer<typeof createMachineSchema>;

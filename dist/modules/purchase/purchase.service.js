@@ -5,6 +5,7 @@ const database_1 = require("../../config/database");
 const appError_1 = require("../../utils/appError");
 const numberUtils_1 = require("../../utils/numberUtils");
 const client_1 = require("@prisma/client");
+const decimal_js_1 = require("decimal.js");
 const ledger_service_1 = require("../ledger/ledger.service");
 class PurchaseService {
     static async list(params) {
@@ -34,6 +35,11 @@ class PurchaseService {
             include: {
                 farmer: { select: { id: true, name: true, code: true, phone: true } },
                 lot: true,
+                harvesterWorks: {
+                    include: {
+                        machine: { select: { id: true, name: true, operatorName: true } },
+                    },
+                },
                 createdBy: { select: { id: true, fullName: true, username: true } },
             },
         });
@@ -50,6 +56,11 @@ class PurchaseService {
                                 dispatch: true,
                             },
                         },
+                    },
+                },
+                harvesterWorks: {
+                    include: {
+                        machine: { select: { id: true, name: true, operatorName: true } },
                     },
                 },
                 createdBy: { select: { id: true, fullName: true, username: true } },
@@ -127,8 +138,80 @@ class PurchaseService {
                     description: `Paddy Purchase (${input.sackCount} sacks, Net ${netWeight} kg @ NPR ${input.rate}/${input.rateUnit})`,
                 },
             });
+            // 4. If Harvester machine was used during harvest of this paddy:
+            let harvesterWork = null;
+            if (input.harvester) {
+                const machine = await tx.harvesterMachine.findUnique({
+                    where: { id: input.harvester.machineId },
+                });
+                if (!machine)
+                    throw new appError_1.NotFoundError('Harvester Machine not found');
+                const durationMinutes = input.harvester.durationMinutes;
+                const hourlyRate = input.harvester.hourlyRate;
+                const durationHours = new decimal_js_1.Decimal(durationMinutes).dividedBy(60);
+                const harvesterCharge = durationHours.times(new decimal_js_1.Decimal(hourlyRate)).toDecimalPlaces(2);
+                harvesterWork = await tx.harvesterWork.create({
+                    data: {
+                        workDate: purchaseDate,
+                        farmerId: input.farmerId,
+                        machineId: input.harvester.machineId,
+                        purchaseId: purchase.id,
+                        landArea: input.harvester.landArea ?? null,
+                        durationMinutes,
+                        hourlyRate,
+                        workQuantity: durationHours.toDecimalPlaces(2).toNumber(),
+                        ratePerUnit: hourlyRate,
+                        totalCharge: harvesterCharge.toNumber(),
+                        chargeHandling: input.harvester.chargeHandling,
+                        notes: input.harvester.notes ?? `Harvesting for Purchase ${purchase.purchaseNumber}`,
+                    },
+                });
+                if (input.harvester.chargeHandling === 'FARMER_DEDUCTION') {
+                    // Debit farmer ledger for harvester deduction
+                    const timeDesc = `${durationMinutes} mins`;
+                    const landDesc = input.harvester.landArea ? ` [${input.harvester.landArea}]` : '';
+                    await tx.ledgerEntry.create({
+                        data: {
+                            partyType: 'FARMER',
+                            farmerId: input.farmerId,
+                            transactionDate: purchaseDate,
+                            entryType: 'DEBIT',
+                            amount: new client_1.Prisma.Decimal(harvesterCharge.toNumber()),
+                            balanceAfter: newBalance.minus(harvesterCharge.toNumber()),
+                            referenceType: 'HARVESTER',
+                            referenceId: harvesterWork.id,
+                            description: `Harvester deduction for Paddy ${purchase.purchaseNumber} (${timeDesc}${landDesc} @ NPR ${hourlyRate}/hr - ${machine.name})`,
+                        },
+                    });
+                }
+                else {
+                    // Company expense: Cost from our pocket, audited on main expense ledger
+                    let category = await tx.expenseCategory.findUnique({
+                        where: { name: 'Harvesting Machinery' },
+                    });
+                    if (!category) {
+                        category = await tx.expenseCategory.create({
+                            data: {
+                                name: 'Harvesting Machinery',
+                            },
+                        });
+                    }
+                    const timeDesc = `${durationMinutes} mins`;
+                    const landDesc = input.harvester.landArea ? ` [${input.harvester.landArea}]` : '';
+                    await tx.businessExpense.create({
+                        data: {
+                            categoryId: category.id,
+                            expenseDate: purchaseDate,
+                            amount: new client_1.Prisma.Decimal(harvesterCharge.toNumber()),
+                            paidTo: machine.operatorName,
+                            notes: `Harvester cost (${timeDesc}${landDesc} - ${machine.name}) for Purchase ${purchase.purchaseNumber}`,
+                            createdById: userId,
+                        },
+                    });
+                }
+            }
             await ledger_service_1.LedgerService.recalculateFarmerLedger(input.farmerId, tx);
-            return { ...purchase, lot };
+            return { ...purchase, lot, harvesterWork };
         });
     }
     static async update(id, input) {

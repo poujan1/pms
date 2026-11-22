@@ -137,11 +137,12 @@ model PaddyPurchase {
   totalAmount Decimal  @db.Decimal(14, 2)
   notes       String?
 
-  lot         PaddyLot?
-  createdById String
-  createdBy   User      @relation(fields: [createdById], references: [id])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  lot            PaddyLot?
+  harvesterWorks HarvesterWork[]
+  createdById    String
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@map("paddy_purchases")
 }
@@ -171,19 +172,24 @@ enum HarvesterChargeHandling {
 }
 
 model HarvesterWork {
-  id             String                  @id @default(uuid())
-  workDate       DateTime
-  farmerId       String
-  farmer         Farmer                  @relation(fields: [farmerId], references: [id])
-  machineId      String
-  machine        HarvesterMachine        @relation(fields: [machineId], references: [id])
-  workQuantity   Decimal                 @db.Decimal(8, 2)
-  ratePerUnit    Decimal                 @db.Decimal(10, 2)
-  totalCharge    Decimal                 @db.Decimal(12, 2)
-  chargeHandling HarvesterChargeHandling
-  notes          String?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id              String                  @id @default(uuid())
+  workDate        DateTime
+  farmerId        String
+  farmer          Farmer                  @relation(fields: [farmerId], references: [id])
+  machineId       String
+  machine         HarvesterMachine        @relation(fields: [machineId], references: [id])
+  purchaseId      String?
+  purchase        PaddyPurchase?          @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  landArea        String?                 // Reference only, e.g. "1.5 Bigha" or "2 Bigha 5 Kattha"
+  durationMinutes Int?                    // Actual work duration in minutes, e.g. 23 mins, 57 mins
+  hourlyRate      Decimal?                @db.Decimal(10, 2) // Hourly rate e.g. 6500.00
+  workQuantity    Decimal                 @db.Decimal(8, 2) // Decimal hours or units for backward compat
+  ratePerUnit     Decimal                 @db.Decimal(10, 2) // Rate
+  totalCharge     Decimal                 @db.Decimal(12, 2) // Calculated charge based on time
+  chargeHandling  HarvesterChargeHandling
+  notes           String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
 
   @@map("harvester_works")
 }

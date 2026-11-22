@@ -10,6 +10,7 @@ const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
 router.get('/machines', harvester_controller_1.HarvesterController.listMachines);
 router.post('/machines', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: harvester_schema_1.createMachineSchema }), harvester_controller_1.HarvesterController.createMachine);
+router.get('/summary', harvester_controller_1.HarvesterController.getSummary);
 router.get('/work', harvester_controller_1.HarvesterController.listWorkLogs);
 router.post('/work', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: harvester_schema_1.logHarvesterWorkSchema }), harvester_controller_1.HarvesterController.logWork);
 exports.default = router;

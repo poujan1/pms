@@ -17,6 +17,7 @@ router.post(
   HarvesterController.createMachine
 );
 
+router.get('/summary', HarvesterController.getSummary);
 router.get('/work', HarvesterController.listWorkLogs);
 router.post(
   '/work',
