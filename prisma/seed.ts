@@ -5,7 +5,6 @@ import { prisma } from "../src/config/database";
 async function main() {
   console.log("🌱 Starting database seed...");
 
-  // 1. Seed Default Owner
   const ownerUsername = "admin";
   const existingOwner = await prisma.user.findUnique({
     where: { username: ownerUsername },
@@ -23,12 +22,11 @@ async function main() {
         role: Role.OWNER,
       },
     });
-    console.log("✅ Default Owner created: admin / admin123");
+    console.log("Default Owner created: admin / admin123");
   } else {
-    console.log("ℹ️ Owner already exists.");
+    console.log("Owner already exists.");
   }
 
-  // 2. Seed Standard Expense Categories
   const standardCategories = [
     "Transport & Freight",
     "Loading / Labor (Hamali)",
@@ -46,9 +44,9 @@ async function main() {
       create: { name },
     });
   }
-  console.log("✅ Standard expense categories seeded.");
+  console.log("Standard expense categories seeded.");
 
-  console.log("🌾 Seed completed successfully!");
+  console.log("Seed completed successfully!");
 }
 
 main()
