@@ -15,7 +15,7 @@ export const createPurchaseSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const updatePurchaseSchema = createPurchaseSchema.partial().omit({ farmerId: true });
+export const updatePurchaseSchema = createPurchaseSchema.partial();
 
 export type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
 export type UpdatePurchaseInput = z.infer<typeof updatePurchaseSchema>;

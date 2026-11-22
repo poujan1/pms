@@ -5,6 +5,7 @@ const database_1 = require("../../config/database");
 const appError_1 = require("../../utils/appError");
 const client_1 = require("@prisma/client");
 const decimal_js_1 = require("decimal.js");
+const ledger_service_1 = require("../ledger/ledger.service");
 class HarvesterService {
     static async listMachines() {
         return database_1.prisma.harvesterMachine.findMany({
@@ -80,6 +81,7 @@ class HarvesterService {
                         description: `Harvester charge deducted (${input.workQuantity} units @ NPR ${input.ratePerUnit} - ${machine.name})`,
                     },
                 });
+                await ledger_service_1.LedgerService.recalculateFarmerLedger(input.farmerId, tx);
             }
             else {
                 // Business expense: Ensure there's a category and log expense

@@ -26,4 +26,10 @@ router.put(
   PurchaseController.update
 );
 
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER]),
+  PurchaseController.delete
+);
+
 export default router;

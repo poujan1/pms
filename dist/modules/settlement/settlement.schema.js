@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createSettlementSchema = exports.deductionItemSchema = void 0;
+exports.updateSettlementSchema = exports.createSettlementSchema = exports.deductionItemSchema = void 0;
 const zod_1 = require("zod");
 const client_1 = require("@prisma/client");
 exports.deductionItemSchema = zod_1.z.object({
@@ -17,3 +17,4 @@ exports.createSettlementSchema = zod_1.z.object({
     millRateUnit: zod_1.z.nativeEnum(client_1.RateUnit).default(client_1.RateUnit.KG),
     deductions: zod_1.z.array(exports.deductionItemSchema).default([]),
 });
+exports.updateSettlementSchema = exports.createSettlementSchema.partial().omit({ dispatchId: true });

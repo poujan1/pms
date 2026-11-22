@@ -2,6 +2,7 @@ import { prisma } from '../../config/database';
 import { CreateMillInput, UpdateMillInput, CreateContractInput } from './mill.schema';
 import { NotFoundError, ConflictError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class MillService {
   static async list(search?: string) {
@@ -94,10 +95,56 @@ export class MillService {
   }
 
   static async update(id: string, input: UpdateMillInput) {
-    await this.getById(id);
-    return prisma.riceMill.update({
-      where: { id },
-      data: input,
+    const existing = await this.getById(id);
+
+    if (input.code && input.code !== existing.code) {
+      const codeTaken = await prisma.riceMill.findFirst({
+        where: { code: input.code, id: { not: id } },
+      });
+      if (codeTaken) {
+        throw new ConflictError(`Rice Mill code '${input.code}' is already assigned to another mill.`);
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.riceMill.update({
+        where: { id },
+        data: {
+          ...(input.code ? { code: input.code } : {}),
+          ...(input.name ? { name: input.name } : {}),
+          ...(input.contactPerson !== undefined ? { contactPerson: input.contactPerson } : {}),
+          ...(input.phone ? { phone: input.phone } : {}),
+          ...(input.location ? { location: input.location } : {}),
+          ...(input.openingBalance !== undefined
+            ? { openingBalance: new Prisma.Decimal(input.openingBalance) }
+            : {}),
+        },
+      });
+
+      if (input.openingBalance !== undefined) {
+        const openingLedger = await tx.ledgerEntry.findFirst({
+          where: {
+            partyType: 'RICE_MILL',
+            millId: id,
+            description: 'Opening balance migration',
+          },
+        });
+
+        if (openingLedger) {
+          await tx.ledgerEntry.update({
+            where: { id: openingLedger.id },
+            data: {
+              entryType: input.openingBalance > 0 ? 'DEBIT' : 'CREDIT',
+              amount: new Prisma.Decimal(Math.abs(input.openingBalance)),
+              balanceAfter: new Prisma.Decimal(input.openingBalance),
+            },
+          });
+        }
+
+        await LedgerService.recalculateMillLedger(id, tx);
+      }
+
+      return updated;
     });
   }
 

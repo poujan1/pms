@@ -2,6 +2,7 @@ import { prisma } from '../../config/database';
 import { CreateFarmerInput, UpdateFarmerInput, FarmerAdvanceInput } from './farmer.schema';
 import { NotFoundError, ConflictError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class FarmerService {
   static async list(search?: string) {
@@ -144,6 +145,8 @@ export class FarmerService {
             },
           });
         }
+
+        await LedgerService.recalculateFarmerLedger(id, tx);
       }
 
       return updated;
@@ -225,6 +228,8 @@ export class FarmerService {
           description: `Pre-harvest advance / cash payment: ${input.notes || ''}`.trim(),
         },
       });
+
+      await LedgerService.recalculateFarmerLedger(farmerId, tx);
 
       return advance;
     });

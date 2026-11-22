@@ -9,5 +9,8 @@ const client_1 = require("@prisma/client");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
 router.get('/', payment_controller_1.PaymentController.list);
+router.get('/:id', payment_controller_1.PaymentController.getById);
 router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: payment_schema_1.createPaymentSchema }), payment_controller_1.PaymentController.create);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: payment_schema_1.updatePaymentSchema }), payment_controller_1.PaymentController.update);
+router.delete('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), payment_controller_1.PaymentController.delete);
 exports.default = router;

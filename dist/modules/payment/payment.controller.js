@@ -13,6 +13,15 @@ class PaymentController {
             next(error);
         }
     }
+    static async getById(req, res, next) {
+        try {
+            const payment = await payment_service_1.PaymentService.getById(req.params.id);
+            return (0, apiResponse_1.sendResponse)({ res, data: payment });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
     static async create(req, res, next) {
         try {
             const payment = await payment_service_1.PaymentService.create(req.body, req.user.id);
@@ -21,6 +30,32 @@ class PaymentController {
                 statusCode: 201,
                 message: 'Payment recorded and ledger updated successfully',
                 data: payment,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async update(req, res, next) {
+        try {
+            const payment = await payment_service_1.PaymentService.update(req.params.id, req.body);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Payment updated and ledger re-balanced successfully',
+                data: payment,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async delete(req, res, next) {
+        try {
+            const deleted = await payment_service_1.PaymentService.delete(req.params.id);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Payment voucher deleted and ledger rolled back successfully',
+                data: deleted,
             });
         }
         catch (error) {

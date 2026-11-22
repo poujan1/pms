@@ -1,7 +1,8 @@
 import { prisma } from '../../config/database';
-import { CreatePaymentInput } from './payment.schema';
+import { CreatePaymentInput, UpdatePaymentInput } from './payment.schema';
 import { NotFoundError, ConflictError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class PaymentService {
   static async list(params?: { partyType?: 'FARMER' | 'RICE_MILL'; partyId?: string; fromDate?: string; toDate?: string }) {
@@ -29,6 +30,21 @@ export class PaymentService {
         createdBy: { select: { id: true, fullName: true, username: true } },
       },
     });
+  }
+
+  static async getById(id: string) {
+    const payment = await prisma.paymentTransaction.findUnique({
+      where: { id },
+      include: {
+        createdBy: { select: { id: true, fullName: true, username: true } },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundError('Payment transaction not found');
+    }
+
+    return payment;
   }
 
   static async create(input: CreatePaymentInput, userId: string) {
@@ -101,7 +117,79 @@ export class PaymentService {
         },
       });
 
+      if (input.partyType === 'FARMER') {
+        await LedgerService.recalculateFarmerLedger(input.partyId, tx);
+      } else {
+        await LedgerService.recalculateMillLedger(input.partyId, tx);
+      }
+
       return payment;
+    });
+  }
+
+  static async update(id: string, input: UpdatePaymentInput) {
+    const existing = await this.getById(id);
+
+    return prisma.$transaction(async (tx) => {
+      const paymentDate = input.paymentDate ? new Date(input.paymentDate) : existing.paymentDate;
+      const amount = input.amount !== undefined ? new Prisma.Decimal(input.amount) : existing.amount;
+      const paymentMode = input.paymentMode ?? existing.paymentMode;
+      const referenceNumber = input.referenceNumber !== undefined ? input.referenceNumber : existing.referenceNumber;
+      const notes = input.notes !== undefined ? input.notes : existing.notes;
+
+      const updated = await tx.paymentTransaction.update({
+        where: { id },
+        data: {
+          paymentDate,
+          amount,
+          paymentMode,
+          referenceNumber,
+          notes,
+        },
+      });
+
+      const ledgerEntry = await tx.ledgerEntry.findFirst({
+        where: { referenceType: 'PAYMENT', referenceId: id },
+      });
+
+      if (ledgerEntry) {
+        await tx.ledgerEntry.update({
+          where: { id: ledgerEntry.id },
+          data: {
+            transactionDate: paymentDate,
+            amount,
+            description: `${existing.partyType === 'FARMER' ? 'Payment to Farmer' : 'Receipt from Rice Mill'} via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''} [Updated]`,
+          },
+        });
+      }
+
+      if (existing.partyType === 'FARMER' && existing.farmerId) {
+        await LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+      } else if (existing.partyType === 'RICE_MILL' && existing.millId) {
+        await LedgerService.recalculateMillLedger(existing.millId, tx);
+      }
+
+      return updated;
+    });
+  }
+
+  static async delete(id: string) {
+    const existing = await this.getById(id);
+
+    return prisma.$transaction(async (tx) => {
+      await tx.ledgerEntry.deleteMany({
+        where: { referenceType: 'PAYMENT', referenceId: id },
+      });
+
+      const deleted = await tx.paymentTransaction.delete({ where: { id } });
+
+      if (existing.partyType === 'FARMER' && existing.farmerId) {
+        await LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+      } else if (existing.partyType === 'RICE_MILL' && existing.millId) {
+        await LedgerService.recalculateMillLedger(existing.millId, tx);
+      }
+
+      return deleted;
     });
   }
 }

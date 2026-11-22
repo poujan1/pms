@@ -16,4 +16,4 @@ exports.createPurchaseSchema = zod_1.z.object({
     rateUnit: zod_1.z.nativeEnum(client_1.RateUnit).default(client_1.RateUnit.KG),
     notes: zod_1.z.string().optional(),
 });
-exports.updatePurchaseSchema = exports.createPurchaseSchema.partial().omit({ farmerId: true });
+exports.updatePurchaseSchema = exports.createPurchaseSchema.partial();

@@ -6,6 +6,117 @@ import { Decimal } from "decimal.js";
 
 export class LedgerService {
   /**
+   * Recalculates all running balances for a farmer's ledger in chronological order.
+   * Ensures that balanceAfter on every entry is exact, and returns the current closing balance.
+   */
+  static async recalculateFarmerLedger(
+    farmerId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Decimal> {
+    const db = tx ?? prisma;
+
+    const farmer = await db.farmer.findUnique({
+      where: { id: farmerId },
+      select: { openingBalance: true },
+    });
+    if (!farmer) return new Decimal(0);
+
+    const entries = await db.ledgerEntry.findMany({
+      where: { partyType: "FARMER", farmerId },
+      orderBy: [
+        { transactionDate: "asc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    const hasOpeningMigration = entries.some(
+      (e) =>
+        e.referenceType === "ADJUSTMENT" &&
+        e.description.toLowerCase().includes("opening balance"),
+    );
+
+    let currentBalance = hasOpeningMigration
+      ? new Decimal(0)
+      : new Decimal(farmer.openingBalance.toString());
+
+    for (const entry of entries) {
+      const amt = new Decimal(entry.amount.toString());
+      if (entry.entryType === "CREDIT") {
+        currentBalance = currentBalance.plus(amt);
+      } else {
+        currentBalance = currentBalance.minus(amt);
+      }
+
+      const currentStored = new Decimal(entry.balanceAfter.toString());
+      if (!currentStored.equals(currentBalance)) {
+        await db.ledgerEntry.update({
+          where: { id: entry.id },
+          data: { balanceAfter: new Prisma.Decimal(currentBalance.toNumber()) },
+        });
+      }
+    }
+
+    return currentBalance;
+  }
+
+  /**
+   * Recalculates all running balances for a rice mill's ledger in chronological order.
+   * Ensures that balanceAfter on every entry is exact, and returns the current closing balance.
+   */
+  static async recalculateMillLedger(
+    millId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Decimal> {
+    const db = tx ?? prisma;
+
+    const mill = await db.riceMill.findUnique({
+      where: { id: millId },
+      select: { openingBalance: true },
+    });
+    if (!mill) return new Decimal(0);
+
+    const entries = await db.ledgerEntry.findMany({
+      where: { partyType: "RICE_MILL", millId },
+      orderBy: [
+        { transactionDate: "asc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
+    });
+
+    const hasOpeningMigration = entries.some(
+      (e) =>
+        e.referenceType === "ADJUSTMENT" &&
+        e.description.toLowerCase().includes("opening balance"),
+    );
+
+    let currentBalance = hasOpeningMigration
+      ? new Decimal(0)
+      : new Decimal(mill.openingBalance.toString());
+
+    for (const entry of entries) {
+      const amt = new Decimal(entry.amount.toString());
+      // For Mill: DEBIT is receivable (we billed mill for delivered paddy), CREDIT is payment received
+      if (entry.entryType === "DEBIT") {
+        currentBalance = currentBalance.plus(amt);
+      } else {
+        currentBalance = currentBalance.minus(amt);
+      }
+
+      const currentStored = new Decimal(entry.balanceAfter.toString());
+      if (!currentStored.equals(currentBalance)) {
+        await db.ledgerEntry.update({
+          where: { id: entry.id },
+          data: { balanceAfter: new Prisma.Decimal(currentBalance.toNumber()) },
+        });
+      }
+    }
+
+    return currentBalance;
+  }
+
+  /**
    * Complete date-wise Farmer Account Statement with Period Opening & Closing Balances
    */
   static async getFarmerStatement(
@@ -29,8 +140,19 @@ export class LedgerService {
     const startDate = fromDate ? new Date(fromDate) : undefined;
     const endDate = toDate ? new Date(toDate) : undefined;
 
-    // 1. Calculate Period Opening Balance (all transactions before `fromDate`)
-    let periodOpeningBalance = new Decimal(farmer.openingBalance.toString());
+    const allFarmerEntries = await prisma.ledgerEntry.findMany({
+      where: { partyType: "FARMER", farmerId },
+      select: { referenceType: true, description: true },
+    });
+    const hasOpeningMigration = allFarmerEntries.some(
+      (e) =>
+        e.referenceType === "ADJUSTMENT" &&
+        e.description.toLowerCase().includes("opening balance"),
+    );
+
+    let periodOpeningBalance = hasOpeningMigration
+      ? new Decimal(0)
+      : new Decimal(farmer.openingBalance.toString());
 
     if (startDate) {
       const priorEntries = await prisma.ledgerEntry.findMany({
@@ -39,7 +161,11 @@ export class LedgerService {
           farmerId,
           transactionDate: { lt: startDate },
         },
-        orderBy: { transactionDate: "asc" },
+        orderBy: [
+          { transactionDate: "asc" },
+          { createdAt: "asc" },
+          { id: "asc" },
+        ],
       });
 
       for (const entry of priorEntries) {
@@ -147,8 +273,20 @@ export class LedgerService {
     const startDate = fromDate ? new Date(fromDate) : undefined;
     const endDate = toDate ? new Date(toDate) : undefined;
 
+    const allMillEntries = await prisma.ledgerEntry.findMany({
+      where: { partyType: "RICE_MILL", millId },
+      select: { referenceType: true, description: true },
+    });
+    const hasOpeningMigration = allMillEntries.some(
+      (e) =>
+        e.referenceType === "ADJUSTMENT" &&
+        e.description.toLowerCase().includes("opening balance"),
+    );
+
     // 1. Calculate Period Opening Balance (all transactions before `fromDate`)
-    let periodOpeningBalance = new Decimal(mill.openingBalance.toString());
+    let periodOpeningBalance = hasOpeningMigration
+      ? new Decimal(0)
+      : new Decimal(mill.openingBalance.toString());
 
     if (startDate) {
       const priorEntries = await prisma.ledgerEntry.findMany({
@@ -157,7 +295,11 @@ export class LedgerService {
           millId,
           transactionDate: { lt: startDate },
         },
-        orderBy: { transactionDate: "asc" },
+        orderBy: [
+          { transactionDate: "asc" },
+          { createdAt: "asc" },
+          { id: "asc" },
+        ],
       });
 
       for (const entry of priorEntries) {
@@ -296,7 +438,11 @@ export class LedgerService {
       // Fetch latest running balance from Ledger
       const latestEntry = await prisma.ledgerEntry.findFirst({
         where: { partyType: "FARMER", farmerId: f.id },
-        orderBy: { transactionDate: "desc" },
+        orderBy: [
+          { transactionDate: "desc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
       });
 
       const currentBalance = latestEntry
@@ -354,6 +500,9 @@ export class LedgerService {
             netPayableByMill: true,
           },
         },
+        payments: {
+          select: { amount: true },
+        },
       },
     });
 
@@ -381,14 +530,33 @@ export class LedgerService {
         );
       }
 
+      let totalReceivedNpr = new Decimal(0);
+      for (const pay of m.payments) {
+        totalReceivedNpr = totalReceivedNpr.plus(pay.amount.toString());
+      }
+
       const latestEntry = await prisma.ledgerEntry.findFirst({
         where: { partyType: "RICE_MILL", millId: m.id },
-        orderBy: { transactionDate: "desc" },
+        orderBy: [
+          { transactionDate: "desc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
       });
 
       const currentBalance = latestEntry
         ? Number(latestEntry.balanceAfter)
         : Number(m.openingBalance);
+
+      const remainingDueNpr = currentBalance > 0.01 ? currentBalance : 0;
+      let paymentStatus: "CLEARED" | "PARTIAL" | "UNPAID" | "ADVANCE_DEPOSIT";
+      if (Math.abs(currentBalance) <= 0.01) {
+        paymentStatus = "CLEARED";
+      } else if (currentBalance > 0.01) {
+        paymentStatus = totalReceivedNpr.greaterThan(0) ? "PARTIAL" : "UNPAID";
+      } else {
+        paymentStatus = "ADVANCE_DEPOSIT";
+      }
 
       summary.push({
         millId: m.id,
@@ -403,8 +571,11 @@ export class LedgerService {
         totalTransitLossKg: totalShortageKg.toNumber(),
         totalSideCutsNpr: totalSideCutsNpr.toNumber(),
         totalBilledNpr: totalNetSettlementNpr.toNumber(),
+        totalReceivedNpr: totalReceivedNpr.toNumber(),
+        remainingDueNpr,
         currentReceivable: currentBalance,
         status: currentBalance >= 0 ? "RECEIVABLE" : "ADVANCE_DEPOSIT",
+        paymentStatus,
       });
     }
 
@@ -492,6 +663,12 @@ export class LedgerService {
           },
         },
       });
+
+      if (input.partyType === "FARMER") {
+        await LedgerService.recalculateFarmerLedger(input.partyId, tx);
+      } else {
+        await LedgerService.recalculateMillLedger(input.partyId, tx);
+      }
 
       return entry;
     });

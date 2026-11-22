@@ -5,6 +5,7 @@ const database_1 = require("../../config/database");
 const appError_1 = require("../../utils/appError");
 const client_1 = require("@prisma/client");
 const decimal_js_1 = require("decimal.js");
+const ledger_service_1 = require("../ledger/ledger.service");
 class SettlementService {
     static async list(params) {
         const where = {
@@ -218,7 +219,173 @@ class SettlementService {
                     description: `Dispatch ${dispatch.dispatchNumber} settlement (${finalAcceptedKg.toFixed(2)} kg accepted @ NPR ${input.millRate}/${input.millRateUnit})`,
                 },
             });
+            await ledger_service_1.LedgerService.recalculateMillLedger(dispatch.millId, tx);
             return settlement;
+        });
+    }
+    static async update(id, input, userId) {
+        const existing = await this.getById(id);
+        const dispatch = existing.dispatch;
+        const receiptDate = input.receiptDate ? new Date(input.receiptDate) : existing.receiptDate;
+        const receivedSacks = input.receivedSacks ?? existing.receivedSacks;
+        const receivedWeightKg = input.receivedWeightKg ?? Number(existing.receivedWeightKg);
+        const millRate = input.millRate ?? Number(existing.millRate);
+        const millRateUnit = input.millRateUnit ?? existing.millRateUnit;
+        const dispatchedNetKg = new decimal_js_1.Decimal(dispatch.netWeightKg.toString());
+        const receivedKg = new decimal_js_1.Decimal(receivedWeightKg);
+        const shortageWeightKg = dispatchedNetKg.minus(receivedKg);
+        let finalAcceptedKg = new decimal_js_1.Decimal(receivedKg);
+        let totalDeductionsNpr = new decimal_js_1.Decimal(0);
+        const calculatedDeductions = [];
+        const deductionsToProcess = input.deductions !== undefined
+            ? input.deductions
+            : existing.deductions.map(d => ({ name: d.name, type: d.type, rateOrValue: Number(d.rateOrValue) }));
+        for (const d of deductionsToProcess) {
+            const val = new decimal_js_1.Decimal(d.rateOrValue);
+            if (d.type === 'WEIGHT_CUT') {
+                finalAcceptedKg = finalAcceptedKg.minus(val);
+                const monetaryImpact = millRateUnit === 'QUINTAL'
+                    ? val.dividedBy(100).times(millRate)
+                    : val.times(millRate);
+                calculatedDeductions.push({
+                    name: d.name,
+                    type: d.type,
+                    rateOrValue: d.rateOrValue,
+                    impactInKg: val.toDecimalPlaces(3).toNumber(),
+                    impactInNpr: monetaryImpact.toDecimalPlaces(2).toNumber(),
+                });
+            }
+            else if (d.type === 'SACK_TARE_CUT') {
+                const totalTareCutKg = val.times(receivedSacks);
+                finalAcceptedKg = finalAcceptedKg.minus(totalTareCutKg);
+                const monetaryImpact = millRateUnit === 'QUINTAL'
+                    ? totalTareCutKg.dividedBy(100).times(millRate)
+                    : totalTareCutKg.times(millRate);
+                calculatedDeductions.push({
+                    name: d.name,
+                    type: d.type,
+                    rateOrValue: d.rateOrValue,
+                    impactInKg: totalTareCutKg.toDecimalPlaces(3).toNumber(),
+                    impactInNpr: monetaryImpact.toDecimalPlaces(2).toNumber(),
+                });
+            }
+            else if (d.type === 'PERCENTAGE_CUT') {
+                const percentCutKg = finalAcceptedKg.times(val).dividedBy(100);
+                finalAcceptedKg = finalAcceptedKg.minus(percentCutKg);
+                const monetaryImpact = millRateUnit === 'QUINTAL'
+                    ? percentCutKg.dividedBy(100).times(millRate)
+                    : percentCutKg.times(millRate);
+                calculatedDeductions.push({
+                    name: d.name,
+                    type: d.type,
+                    rateOrValue: d.rateOrValue,
+                    impactInKg: percentCutKg.toDecimalPlaces(3).toNumber(),
+                    impactInNpr: monetaryImpact.toDecimalPlaces(2).toNumber(),
+                });
+            }
+        }
+        if (finalAcceptedKg.isNegative()) {
+            throw new appError_1.BadRequestError('Deductions exceed the total received weight');
+        }
+        const grossSettlementNpr = millRateUnit === 'QUINTAL'
+            ? finalAcceptedKg.dividedBy(100).times(millRate).toDecimalPlaces(2)
+            : finalAcceptedKg.times(millRate).toDecimalPlaces(2);
+        let netPayableByMill = new decimal_js_1.Decimal(grossSettlementNpr);
+        for (const d of deductionsToProcess) {
+            const val = new decimal_js_1.Decimal(d.rateOrValue);
+            if (d.type === 'PER_UNIT_RATE_CUT') {
+                const moneyCut = millRateUnit === 'QUINTAL'
+                    ? finalAcceptedKg.dividedBy(100).times(val)
+                    : finalAcceptedKg.times(val);
+                totalDeductionsNpr = totalDeductionsNpr.plus(moneyCut);
+                netPayableByMill = netPayableByMill.minus(moneyCut);
+                calculatedDeductions.push({
+                    name: d.name,
+                    type: d.type,
+                    rateOrValue: d.rateOrValue,
+                    impactInKg: null,
+                    impactInNpr: moneyCut.toDecimalPlaces(2).toNumber(),
+                });
+            }
+            else if (d.type === 'FIXED_MONEY_CUT') {
+                totalDeductionsNpr = totalDeductionsNpr.plus(val);
+                netPayableByMill = netPayableByMill.minus(val);
+                calculatedDeductions.push({
+                    name: d.name,
+                    type: d.type,
+                    rateOrValue: d.rateOrValue,
+                    impactInKg: null,
+                    impactInNpr: val.toDecimalPlaces(2).toNumber(),
+                });
+            }
+        }
+        return database_1.prisma.$transaction(async (tx) => {
+            // 1. Delete existing deductions and replace if new deductions provided
+            if (input.deductions !== undefined) {
+                await tx.millDeduction.deleteMany({ where: { settlementId: id } });
+            }
+            // 2. Update settlement
+            const updated = await tx.millSettlement.update({
+                where: { id },
+                data: {
+                    receiptDate,
+                    receivedSacks,
+                    receivedWeightKg,
+                    shortageWeightKg: shortageWeightKg.toDecimalPlaces(3).toNumber(),
+                    millRate,
+                    millRateUnit,
+                    finalAcceptedKg: finalAcceptedKg.toDecimalPlaces(3).toNumber(),
+                    grossSettlementNpr: grossSettlementNpr.toNumber(),
+                    totalDeductionsNpr: totalDeductionsNpr.toNumber(),
+                    netPayableByMill: netPayableByMill.toNumber(),
+                    ...(input.deductions !== undefined
+                        ? {
+                            deductions: {
+                                create: calculatedDeductions,
+                            },
+                        }
+                        : {}),
+                },
+                include: { deductions: true },
+            });
+            // 3. Update associated ledger entry
+            const ledgerEntry = await tx.ledgerEntry.findFirst({
+                where: { referenceType: 'SETTLEMENT', referenceId: id },
+            });
+            if (ledgerEntry) {
+                await tx.ledgerEntry.update({
+                    where: { id: ledgerEntry.id },
+                    data: {
+                        transactionDate: receiptDate,
+                        amount: new client_1.Prisma.Decimal(netPayableByMill.toNumber()),
+                        description: `Dispatch ${dispatch.dispatchNumber} settlement (${finalAcceptedKg.toFixed(2)} kg accepted @ NPR ${millRate}/${millRateUnit}) [Updated]`,
+                    },
+                });
+            }
+            // 4. Automatically re-balance mill ledger
+            await ledger_service_1.LedgerService.recalculateMillLedger(existing.millId, tx);
+            return updated;
+        });
+    }
+    static async delete(id) {
+        const existing = await this.getById(id);
+        return database_1.prisma.$transaction(async (tx) => {
+            // 1. Reset dispatch status
+            await tx.truckDispatch.update({
+                where: { id: existing.dispatchId },
+                data: { status: 'IN_TRANSIT' },
+            });
+            // 2. Delete deductions
+            await tx.millDeduction.deleteMany({ where: { settlementId: id } });
+            // 3. Delete ledger entry
+            await tx.ledgerEntry.deleteMany({
+                where: { referenceType: 'SETTLEMENT', referenceId: id },
+            });
+            // 4. Delete settlement
+            const deleted = await tx.millSettlement.delete({ where: { id } });
+            // 5. Recalculate mill ledger
+            await ledger_service_1.LedgerService.recalculateMillLedger(existing.millId, tx);
+            return deleted;
         });
     }
 }

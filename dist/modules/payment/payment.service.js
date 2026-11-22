@@ -4,6 +4,7 @@ exports.PaymentService = void 0;
 const database_1 = require("../../config/database");
 const appError_1 = require("../../utils/appError");
 const client_1 = require("@prisma/client");
+const ledger_service_1 = require("../ledger/ledger.service");
 class PaymentService {
     static async list(params) {
         const where = {
@@ -29,6 +30,18 @@ class PaymentService {
                 createdBy: { select: { id: true, fullName: true, username: true } },
             },
         });
+    }
+    static async getById(id) {
+        const payment = await database_1.prisma.paymentTransaction.findUnique({
+            where: { id },
+            include: {
+                createdBy: { select: { id: true, fullName: true, username: true } },
+            },
+        });
+        if (!payment) {
+            throw new appError_1.NotFoundError('Payment transaction not found');
+        }
+        return payment;
     }
     static async create(input, userId) {
         const existing = await database_1.prisma.paymentTransaction.findUnique({
@@ -93,7 +106,69 @@ class PaymentService {
                     description: `${input.partyType === 'FARMER' ? 'Payment to Farmer' : 'Receipt from Rice Mill'} via ${input.paymentMode}${input.referenceNumber ? ` (Ref: ${input.referenceNumber})` : ''}`,
                 },
             });
+            if (input.partyType === 'FARMER') {
+                await ledger_service_1.LedgerService.recalculateFarmerLedger(input.partyId, tx);
+            }
+            else {
+                await ledger_service_1.LedgerService.recalculateMillLedger(input.partyId, tx);
+            }
             return payment;
+        });
+    }
+    static async update(id, input) {
+        const existing = await this.getById(id);
+        return database_1.prisma.$transaction(async (tx) => {
+            const paymentDate = input.paymentDate ? new Date(input.paymentDate) : existing.paymentDate;
+            const amount = input.amount !== undefined ? new client_1.Prisma.Decimal(input.amount) : existing.amount;
+            const paymentMode = input.paymentMode ?? existing.paymentMode;
+            const referenceNumber = input.referenceNumber !== undefined ? input.referenceNumber : existing.referenceNumber;
+            const notes = input.notes !== undefined ? input.notes : existing.notes;
+            const updated = await tx.paymentTransaction.update({
+                where: { id },
+                data: {
+                    paymentDate,
+                    amount,
+                    paymentMode,
+                    referenceNumber,
+                    notes,
+                },
+            });
+            const ledgerEntry = await tx.ledgerEntry.findFirst({
+                where: { referenceType: 'PAYMENT', referenceId: id },
+            });
+            if (ledgerEntry) {
+                await tx.ledgerEntry.update({
+                    where: { id: ledgerEntry.id },
+                    data: {
+                        transactionDate: paymentDate,
+                        amount,
+                        description: `${existing.partyType === 'FARMER' ? 'Payment to Farmer' : 'Receipt from Rice Mill'} via ${paymentMode}${referenceNumber ? ` (Ref: ${referenceNumber})` : ''} [Updated]`,
+                    },
+                });
+            }
+            if (existing.partyType === 'FARMER' && existing.farmerId) {
+                await ledger_service_1.LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+            }
+            else if (existing.partyType === 'RICE_MILL' && existing.millId) {
+                await ledger_service_1.LedgerService.recalculateMillLedger(existing.millId, tx);
+            }
+            return updated;
+        });
+    }
+    static async delete(id) {
+        const existing = await this.getById(id);
+        return database_1.prisma.$transaction(async (tx) => {
+            await tx.ledgerEntry.deleteMany({
+                where: { referenceType: 'PAYMENT', referenceId: id },
+            });
+            const deleted = await tx.paymentTransaction.delete({ where: { id } });
+            if (existing.partyType === 'FARMER' && existing.farmerId) {
+                await ledger_service_1.LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+            }
+            else if (existing.partyType === 'RICE_MILL' && existing.millId) {
+                await ledger_service_1.LedgerService.recalculateMillLedger(existing.millId, tx);
+            }
+            return deleted;
         });
     }
 }

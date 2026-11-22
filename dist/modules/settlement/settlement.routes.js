@@ -11,4 +11,6 @@ router.use(auth_1.authenticate);
 router.get('/', settlement_controller_1.SettlementController.list);
 router.get('/:id', settlement_controller_1.SettlementController.getById);
 router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: settlement_schema_1.createSettlementSchema }), settlement_controller_1.SettlementController.create);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: settlement_schema_1.updateSettlementSchema }), settlement_controller_1.SettlementController.update);
+router.delete('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), settlement_controller_1.SettlementController.delete);
 exports.default = router;

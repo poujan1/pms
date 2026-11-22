@@ -17,4 +17,7 @@ export const createSettlementSchema = z.object({
   deductions: z.array(deductionItemSchema).default([]),
 });
 
+export const updateSettlementSchema = createSettlementSchema.partial().omit({ dispatchId: true });
+
 export type CreateSettlementInput = z.infer<typeof createSettlementSchema>;
+export type UpdateSettlementInput = z.infer<typeof updateSettlementSchema>;

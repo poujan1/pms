@@ -36,5 +36,31 @@ class SettlementController {
             next(error);
         }
     }
+    static async update(req, res, next) {
+        try {
+            const settlement = await settlement_service_1.SettlementService.update(req.params.id, req.body, req.user.id);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Mill settlement updated, deductions recalculated, and mill ledger re-balanced',
+                data: settlement,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
+    static async delete(req, res, next) {
+        try {
+            const deleted = await settlement_service_1.SettlementService.delete(req.params.id);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Mill settlement deleted, dispatch returned to in-transit, and mill ledger re-balanced',
+                data: deleted,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.SettlementController = SettlementController;

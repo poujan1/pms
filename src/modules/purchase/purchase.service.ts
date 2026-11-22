@@ -3,6 +3,7 @@ import { CreatePurchaseInput, UpdatePurchaseInput } from './purchase.schema';
 import { NotFoundError, ConflictError, BadRequestError } from '../../utils/appError';
 import { calculateNetWeight, calculatePurchaseAmount } from '../../utils/numberUtils';
 import { Prisma } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class PurchaseService {
   static async list(params?: { farmerId?: string; fromDate?: string; toDate?: string; search?: string }) {
@@ -139,6 +140,8 @@ export class PurchaseService {
         },
       });
 
+      await LedgerService.recalculateFarmerLedger(input.farmerId, tx);
+
       return { ...purchase, lot };
     });
   }
@@ -153,10 +156,13 @@ export class PurchaseService {
       const rate = input.rate ?? Number(existing.rate);
       const rateUnit = input.rateUnit ?? existing.rateUnit;
       const totalAmount = calculatePurchaseAmount(netWeight, rate, rateUnit);
+      const newFarmerId = input.farmerId ?? existing.farmerId;
+      const purchaseDate = input.purchaseDate ? new Date(input.purchaseDate) : existing.purchaseDate;
 
       const updated = await tx.paddyPurchase.update({
         where: { id },
         data: {
+          farmerId: newFarmerId,
           variety: input.variety ?? existing.variety,
           fieldLocation: input.fieldLocation ?? existing.fieldLocation,
           sackCount: input.sackCount ?? existing.sackCount,
@@ -167,7 +173,7 @@ export class PurchaseService {
           rateUnit,
           totalAmount: totalAmount.toNumber(),
           notes: input.notes !== undefined ? input.notes : existing.notes,
-          purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : existing.purchaseDate,
+          purchaseDate,
         },
       });
 
@@ -192,13 +198,52 @@ export class PurchaseService {
         await tx.ledgerEntry.update({
           where: { id: ledgerEntry.id },
           data: {
+            farmerId: newFarmerId,
+            transactionDate: purchaseDate,
             amount: new Prisma.Decimal(totalAmount.toNumber()),
             description: `Paddy Purchase (${updated.sackCount} sacks, Net ${netWeight} kg @ NPR ${rate}/${rateUnit}) [Updated]`,
           },
         });
       }
 
+      // Automatically recalculate and balance farmer's ledger
+      await LedgerService.recalculateFarmerLedger(newFarmerId, tx);
+      if (newFarmerId !== existing.farmerId) {
+        await LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+      }
+
       return updated;
+    });
+  }
+
+  static async delete(id: string) {
+    const existing = await this.getById(id);
+
+    const lot = await prisma.paddyLot.findFirst({
+      where: { purchaseId: id },
+      include: { dispatchAllocations: true },
+    });
+
+    if (lot && lot.dispatchAllocations.length > 0) {
+      throw new BadRequestError(
+        'Cannot delete purchase because its stock lot is already allocated to dispatches. Please remove or adjust the dispatches first.',
+      );
+    }
+
+    return prisma.$transaction(async (tx) => {
+      if (lot) {
+        await tx.paddyLot.delete({ where: { id: lot.id } });
+      }
+
+      await tx.ledgerEntry.deleteMany({
+        where: { referenceType: 'PURCHASE', referenceId: id },
+      });
+
+      const deleted = await tx.paddyPurchase.delete({ where: { id } });
+
+      await LedgerService.recalculateFarmerLedger(existing.farmerId, tx);
+
+      return deleted;
     });
   }
 }

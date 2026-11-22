@@ -3,6 +3,7 @@ import { CreateMachineInput, LogHarvesterWorkInput } from './harvester.schema';
 import { NotFoundError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
 import { Decimal } from 'decimal.js';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class HarvesterService {
   static async listMachines() {
@@ -88,6 +89,8 @@ export class HarvesterService {
             description: `Harvester charge deducted (${input.workQuantity} units @ NPR ${input.ratePerUnit} - ${machine.name})`,
           },
         });
+
+        await LedgerService.recalculateFarmerLedger(input.farmerId, tx);
       } else {
         // Business expense: Ensure there's a category and log expense
         let category = await tx.expenseCategory.findUnique({

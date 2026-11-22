@@ -49,5 +49,18 @@ class PurchaseController {
             next(error);
         }
     }
+    static async delete(req, res, next) {
+        try {
+            const deleted = await purchase_service_1.PurchaseService.delete(req.params.id);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Purchase deleted, stock lot released, and farmer ledger re-balanced',
+                data: deleted,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.PurchaseController = PurchaseController;

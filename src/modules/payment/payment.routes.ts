@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PaymentController } from './payment.controller';
 import { validateRequest } from '../../middlewares/validate';
 import { authenticate, authorize } from '../../middlewares/auth';
-import { createPaymentSchema } from './payment.schema';
+import { createPaymentSchema, updatePaymentSchema } from './payment.schema';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -10,12 +10,26 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', PaymentController.list);
+router.get('/:id', PaymentController.getById);
 
 router.post(
   '/',
   authorize([Role.OWNER, Role.MANAGER]),
   validateRequest({ body: createPaymentSchema }),
   PaymentController.create
+);
+
+router.put(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER]),
+  validateRequest({ body: updatePaymentSchema }),
+  PaymentController.update
+);
+
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER]),
+  PaymentController.delete
 );
 
 export default router;

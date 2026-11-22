@@ -4,6 +4,7 @@ exports.FarmerService = void 0;
 const database_1 = require("../../config/database");
 const appError_1 = require("../../utils/appError");
 const client_1 = require("@prisma/client");
+const ledger_service_1 = require("../ledger/ledger.service");
 class FarmerService {
     static async list(search) {
         const where = search
@@ -130,6 +131,7 @@ class FarmerService {
                         },
                     });
                 }
+                await ledger_service_1.LedgerService.recalculateFarmerLedger(id, tx);
             }
             return updated;
         });
@@ -199,6 +201,7 @@ class FarmerService {
                     description: `Pre-harvest advance / cash payment: ${input.notes || ''}`.trim(),
                 },
             });
+            await ledger_service_1.LedgerService.recalculateFarmerLedger(farmerId, tx);
             return advance;
         });
     }
