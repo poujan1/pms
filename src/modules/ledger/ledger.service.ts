@@ -5,10 +5,6 @@ import { Prisma } from "@prisma/client";
 import { Decimal } from "decimal.js";
 
 export class LedgerService {
-  /**
-   * Recalculates all running balances for a farmer's ledger in chronological order.
-   * Ensures that balanceAfter on every entry is exact, and returns the current closing balance.
-   */
   static async recalculateFarmerLedger(
     farmerId: string,
     tx?: Prisma.TransactionClient,
@@ -424,7 +420,9 @@ export class LedgerService {
 
       let totalDirectPaymentsNpr = new Decimal(0);
       for (const pay of f.payments) {
-        totalDirectPaymentsNpr = totalDirectPaymentsNpr.plus(pay.amount.toString());
+        totalDirectPaymentsNpr = totalDirectPaymentsNpr.plus(
+          pay.amount.toString(),
+        );
       }
       const totalPaidNpr = totalDirectPaymentsNpr.plus(totalAdvancesNpr);
 
