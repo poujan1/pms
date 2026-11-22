@@ -10,7 +10,7 @@ exports.deductionItemSchema = zod_1.z.object({
 });
 exports.createSettlementSchema = zod_1.z.object({
     dispatchId: zod_1.z.string().uuid(),
-    receiptDate: zod_1.z.string().datetime().optional(),
+    receiptDate: zod_1.z.string().optional().nullable(),
     receivedSacks: zod_1.z.number().int().positive(),
     receivedWeightKg: zod_1.z.number().positive(),
     millRate: zod_1.z.number().positive(),

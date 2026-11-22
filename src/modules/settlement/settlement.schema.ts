@@ -9,7 +9,7 @@ export const deductionItemSchema = z.object({
 
 export const createSettlementSchema = z.object({
   dispatchId: z.string().uuid(),
-  receiptDate: z.string().datetime().optional(),
+  receiptDate: z.string().optional().nullable(),
   receivedSacks: z.number().int().positive(),
   receivedWeightKg: z.number().positive(),
   millRate: z.number().positive(),

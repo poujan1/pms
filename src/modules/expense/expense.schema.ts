@@ -6,7 +6,7 @@ export const createCategorySchema = z.object({
 
 export const createExpenseSchema = z.object({
   categoryId: z.string().uuid(),
-  expenseDate: z.string().datetime().optional(),
+  expenseDate: z.string().optional().nullable(),
   amount: z.number().positive('Expense amount must be greater than 0'),
   paidTo: z.string().optional(),
   notes: z.string().optional(),

@@ -8,7 +8,7 @@ export const createMachineSchema = z.object({
 });
 
 export const logHarvesterWorkSchema = z.object({
-  workDate: z.string().datetime().optional(),
+  workDate: z.string().optional().nullable(),
   farmerId: z.string().uuid(),
   machineId: z.string().uuid(),
   workQuantity: z.number().positive('Work quantity must be greater than 0'),

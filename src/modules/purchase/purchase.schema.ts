@@ -4,7 +4,7 @@ import { RateUnit } from '@prisma/client';
 export const createPurchaseSchema = z.object({
   purchaseNumber: z.string().min(1),
   farmerId: z.string().uuid(),
-  purchaseDate: z.string().datetime().optional(),
+  purchaseDate: z.string().optional().nullable(),
   variety: z.string().optional(),
   fieldLocation: z.string().optional(),
   sackCount: z.number().int().positive('Sack count must be at least 1'),

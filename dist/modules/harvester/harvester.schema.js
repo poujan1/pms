@@ -9,7 +9,7 @@ exports.createMachineSchema = zod_1.z.object({
     operatorPhone: zod_1.z.string().optional(),
 });
 exports.logHarvesterWorkSchema = zod_1.z.object({
-    workDate: zod_1.z.string().datetime().optional(),
+    workDate: zod_1.z.string().optional().nullable(),
     farmerId: zod_1.z.string().uuid(),
     machineId: zod_1.z.string().uuid(),
     workQuantity: zod_1.z.number().positive('Work quantity must be greater than 0'),

@@ -63,17 +63,19 @@ export class PaymentService {
           partyType: input.partyType,
           farmerId: input.partyType === 'FARMER' ? input.partyId : null,
           millId: input.partyType === 'RICE_MILL' ? input.partyId : null,
-          amount: input.amount,
+          amount: new Prisma.Decimal(input.amount),
           paymentMode: input.paymentMode,
-          referenceNumber: input.referenceNumber,
-          notes: input.notes,
+          referenceNumber: input.referenceNumber || null,
+          notes: input.notes || null,
           createdById: userId,
         },
       });
 
       // 3. Post to the relevant ledger
       const lastEntry = await tx.ledgerEntry.findFirst({
-        where: input.partyType === 'FARMER' ? { farmerId: input.partyId } : { millId: input.partyId },
+        where: input.partyType === 'FARMER'
+          ? { partyType: 'FARMER', farmerId: input.partyId }
+          : { partyType: 'RICE_MILL', millId: input.partyId },
         orderBy: { transactionDate: 'desc' },
       });
 

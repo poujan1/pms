@@ -10,7 +10,7 @@ export const createDispatchSchema = z.object({
   dispatchNumber: z.string().min(1),
   millId: z.string().uuid(),
   contractId: z.string().uuid().optional(),
-  dispatchDate: z.string().datetime().optional(),
+  dispatchDate: z.string().optional().nullable(),
   truckNumber: z.string().min(1),
   driverName: z.string().min(1),
   driverPhone: z.string().optional(),

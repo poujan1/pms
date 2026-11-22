@@ -7,7 +7,7 @@ exports.createCategorySchema = zod_1.z.object({
 });
 exports.createExpenseSchema = zod_1.z.object({
     categoryId: zod_1.z.string().uuid(),
-    expenseDate: zod_1.z.string().datetime().optional(),
+    expenseDate: zod_1.z.string().optional().nullable(),
     amount: zod_1.z.number().positive('Expense amount must be greater than 0'),
     paidTo: zod_1.z.string().optional(),
     notes: zod_1.z.string().optional(),

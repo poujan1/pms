@@ -11,7 +11,7 @@ exports.createDispatchSchema = zod_1.z.object({
     dispatchNumber: zod_1.z.string().min(1),
     millId: zod_1.z.string().uuid(),
     contractId: zod_1.z.string().uuid().optional(),
-    dispatchDate: zod_1.z.string().datetime().optional(),
+    dispatchDate: zod_1.z.string().optional().nullable(),
     truckNumber: zod_1.z.string().min(1),
     driverName: zod_1.z.string().min(1),
     driverPhone: zod_1.z.string().optional(),

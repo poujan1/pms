@@ -6,7 +6,7 @@ const client_1 = require("@prisma/client");
 exports.createPurchaseSchema = zod_1.z.object({
     purchaseNumber: zod_1.z.string().min(1),
     farmerId: zod_1.z.string().uuid(),
-    purchaseDate: zod_1.z.string().datetime().optional(),
+    purchaseDate: zod_1.z.string().optional().nullable(),
     variety: zod_1.z.string().optional(),
     fieldLocation: zod_1.z.string().optional(),
     sackCount: zod_1.z.number().int().positive('Sack count must be at least 1'),
