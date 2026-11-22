@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const purchase_controller_1 = require("./purchase.controller");
+const validate_1 = require("../../middlewares/validate");
+const auth_1 = require("../../middlewares/auth");
+const purchase_schema_1 = require("./purchase.schema");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/', purchase_controller_1.PurchaseController.list);
+router.get('/:id', purchase_controller_1.PurchaseController.getById);
+router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER, client_1.Role.EMPLOYEE]), (0, validate_1.validateRequest)({ body: purchase_schema_1.createPurchaseSchema }), purchase_controller_1.PurchaseController.create);
+exports.default = router;

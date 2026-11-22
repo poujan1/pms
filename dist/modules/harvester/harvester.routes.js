@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const harvester_controller_1 = require("./harvester.controller");
+const validate_1 = require("../../middlewares/validate");
+const auth_1 = require("../../middlewares/auth");
+const harvester_schema_1 = require("./harvester.schema");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/machines', harvester_controller_1.HarvesterController.listMachines);
+router.post('/machines', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: harvester_schema_1.createMachineSchema }), harvester_controller_1.HarvesterController.createMachine);
+router.get('/work', harvester_controller_1.HarvesterController.listWorkLogs);
+router.post('/work', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: harvester_schema_1.logHarvesterWorkSchema }), harvester_controller_1.HarvesterController.logWork);
+exports.default = router;

@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const report_controller_1 = require("./report.controller");
+const auth_1 = require("../../middlewares/auth");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/dashboard-summary', report_controller_1.ReportController.getDashboardSummary);
+router.get('/dispatch-pnl/:dispatchId', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), report_controller_1.ReportController.getDispatchProfitLoss);
+exports.default = router;

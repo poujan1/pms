@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const dispatch_controller_1 = require("./dispatch.controller");
+const validate_1 = require("../../middlewares/validate");
+const auth_1 = require("../../middlewares/auth");
+const dispatch_schema_1 = require("./dispatch.schema");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/', dispatch_controller_1.DispatchController.list);
+router.get('/available-lots', dispatch_controller_1.DispatchController.getAvailableLots);
+router.get('/:id', dispatch_controller_1.DispatchController.getById);
+router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER, client_1.Role.EMPLOYEE]), (0, validate_1.validateRequest)({ body: dispatch_schema_1.createDispatchSchema }), dispatch_controller_1.DispatchController.create);
+exports.default = router;

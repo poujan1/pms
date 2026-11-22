@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const mill_controller_1 = require("./mill.controller");
+const validate_1 = require("../../middlewares/validate");
+const auth_1 = require("../../middlewares/auth");
+const mill_schema_1 = require("./mill.schema");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/', mill_controller_1.MillController.list);
+router.get('/:id', mill_controller_1.MillController.getById);
+router.get('/:id/ledger', mill_controller_1.MillController.getLedger);
+router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: mill_schema_1.createMillSchema }), mill_controller_1.MillController.create);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: mill_schema_1.updateMillSchema }), mill_controller_1.MillController.update);
+router.post('/:id/contracts', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: mill_schema_1.createContractSchema }), mill_controller_1.MillController.createContract);
+exports.default = router;

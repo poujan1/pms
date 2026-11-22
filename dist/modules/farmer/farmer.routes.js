@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const farmer_controller_1 = require("./farmer.controller");
+const validate_1 = require("../../middlewares/validate");
+const auth_1 = require("../../middlewares/auth");
+const farmer_schema_1 = require("./farmer.schema");
+const client_1 = require("@prisma/client");
+const router = (0, express_1.Router)();
+router.use(auth_1.authenticate);
+router.get('/', farmer_controller_1.FarmerController.list);
+router.get('/:id', farmer_controller_1.FarmerController.getById);
+router.get('/:id/ledger', farmer_controller_1.FarmerController.getLedger);
+router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: farmer_schema_1.createFarmerSchema }), farmer_controller_1.FarmerController.create);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: farmer_schema_1.updateFarmerSchema }), farmer_controller_1.FarmerController.update);
+router.post('/:id/advances', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: farmer_schema_1.farmerAdvanceSchema }), farmer_controller_1.FarmerController.recordAdvance);
+exports.default = router;
