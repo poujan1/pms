@@ -61,5 +61,28 @@ class ExpenseService {
             },
         });
     }
+    static async updateExpense(id, input) {
+        const existing = await database_1.prisma.businessExpense.findUnique({ where: { id } });
+        if (!existing)
+            throw new appError_1.NotFoundError('Expense record not found');
+        if (input.categoryId) {
+            const cat = await database_1.prisma.expenseCategory.findUnique({ where: { id: input.categoryId } });
+            if (!cat)
+                throw new appError_1.NotFoundError('Expense category not found');
+        }
+        return database_1.prisma.businessExpense.update({
+            where: { id },
+            data: {
+                ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+                ...(input.amount !== undefined ? { amount: input.amount } : {}),
+                ...(input.paidTo !== undefined ? { paidTo: input.paidTo } : {}),
+                ...(input.notes !== undefined ? { notes: input.notes } : {}),
+                ...(input.expenseDate ? { expenseDate: new Date(input.expenseDate) } : {}),
+            },
+            include: {
+                category: true,
+            },
+        });
+    }
 }
 exports.ExpenseService = ExpenseService;

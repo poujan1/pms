@@ -1,5 +1,5 @@
 import { prisma } from '../../config/database';
-import { CreateDispatchInput } from './dispatch.schema';
+import { CreateDispatchInput, UpdateDispatchInput } from './dispatch.schema';
 import { NotFoundError, ConflictError, BadRequestError } from '../../utils/appError';
 import { calculateNetWeight } from '../../utils/numberUtils';
 import { Prisma, DispatchStatus } from '@prisma/client';
@@ -184,6 +184,22 @@ export class DispatchService {
       });
 
       return dispatch;
+    });
+  }
+
+  static async update(id: string, input: UpdateDispatchInput) {
+    await this.getById(id);
+    return prisma.truckDispatch.update({
+      where: { id },
+      data: {
+        ...(input.truckNumber ? { truckNumber: input.truckNumber } : {}),
+        ...(input.driverName ? { driverName: input.driverName } : {}),
+        ...(input.driverPhone !== undefined ? { driverPhone: input.driverPhone } : {}),
+        ...(input.transportCost !== undefined ? { transportCost: input.transportCost } : {}),
+        ...(input.loadingLaborCost !== undefined ? { loadingLaborCost: input.loadingLaborCost } : {}),
+        ...(input.otherExpenses !== undefined ? { otherExpenses: input.otherExpenses } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      },
     });
   }
 }

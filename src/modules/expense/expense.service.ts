@@ -1,5 +1,5 @@
 import { prisma } from '../../config/database';
-import { CreateCategoryInput, CreateExpenseInput } from './expense.schema';
+import { CreateCategoryInput, CreateExpenseInput, UpdateExpenseInput } from './expense.schema';
 import { NotFoundError, ConflictError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
 
@@ -60,6 +60,30 @@ export class ExpenseService {
         paidTo: input.paidTo,
         notes: input.notes,
         createdById: userId,
+      },
+      include: {
+        category: true,
+      },
+    });
+  }
+
+  static async updateExpense(id: string, input: UpdateExpenseInput) {
+    const existing = await prisma.businessExpense.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError('Expense record not found');
+
+    if (input.categoryId) {
+      const cat = await prisma.expenseCategory.findUnique({ where: { id: input.categoryId } });
+      if (!cat) throw new NotFoundError('Expense category not found');
+    }
+
+    return prisma.businessExpense.update({
+      where: { id },
+      data: {
+        ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+        ...(input.amount !== undefined ? { amount: input.amount } : {}),
+        ...(input.paidTo !== undefined ? { paidTo: input.paidTo } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.expenseDate ? { expenseDate: new Date(input.expenseDate) } : {}),
       },
       include: {
         category: true,

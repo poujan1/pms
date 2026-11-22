@@ -34,4 +34,17 @@ export class PurchaseController {
       next(error);
     }
   }
+
+  static async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const purchase = await PurchaseService.update(req.params.id, req.body);
+      return sendResponse({
+        res,
+        message: 'Paddy purchase updated, lot weight and ledger synchronized',
+        data: purchase,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

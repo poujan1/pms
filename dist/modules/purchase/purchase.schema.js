@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createPurchaseSchema = void 0;
+exports.updatePurchaseSchema = exports.createPurchaseSchema = void 0;
 const zod_1 = require("zod");
 const client_1 = require("@prisma/client");
 exports.createPurchaseSchema = zod_1.z.object({
@@ -16,3 +16,4 @@ exports.createPurchaseSchema = zod_1.z.object({
     rateUnit: zod_1.z.nativeEnum(client_1.RateUnit).default(client_1.RateUnit.KG),
     notes: zod_1.z.string().optional(),
 });
+exports.updatePurchaseSchema = exports.createPurchaseSchema.partial().omit({ farmerId: true });

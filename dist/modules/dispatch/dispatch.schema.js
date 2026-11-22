@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createDispatchSchema = exports.lotAllocationSchema = void 0;
+exports.updateDispatchSchema = exports.createDispatchSchema = exports.lotAllocationSchema = void 0;
 const zod_1 = require("zod");
 exports.lotAllocationSchema = zod_1.z.object({
     lotId: zod_1.z.string().uuid(),
@@ -22,4 +22,13 @@ exports.createDispatchSchema = zod_1.z.object({
     loadingLaborCost: zod_1.z.number().min(0).default(0),
     otherExpenses: zod_1.z.number().min(0).default(0),
     allocations: zod_1.z.array(exports.lotAllocationSchema).min(1, 'Must allocate at least one lot'),
+});
+exports.updateDispatchSchema = zod_1.z.object({
+    truckNumber: zod_1.z.string().min(1).optional(),
+    driverName: zod_1.z.string().min(1).optional(),
+    driverPhone: zod_1.z.string().optional(),
+    transportCost: zod_1.z.number().min(0).optional(),
+    loadingLaborCost: zod_1.z.number().min(0).optional(),
+    otherExpenses: zod_1.z.number().min(0).optional(),
+    notes: zod_1.z.string().optional(),
 });

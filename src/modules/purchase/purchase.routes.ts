@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { PurchaseController } from './purchase.controller';
 import { validateRequest } from '../../middlewares/validate';
 import { authenticate, authorize } from '../../middlewares/auth';
-import { createPurchaseSchema } from './purchase.schema';
+import { createPurchaseSchema, updatePurchaseSchema } from './purchase.schema';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -17,6 +17,13 @@ router.post(
   authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
   validateRequest({ body: createPurchaseSchema }),
   PurchaseController.create
+);
+
+router.put(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER]),
+  validateRequest({ body: updatePurchaseSchema }),
+  PurchaseController.update
 );
 
 export default router;

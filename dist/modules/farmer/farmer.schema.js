@@ -10,7 +10,7 @@ exports.createFarmerSchema = zod_1.z.object({
     openingBalance: zod_1.z.number().default(0), // +ve means we owe farmer, -ve means advance
     openingDate: zod_1.z.string().datetime().optional(),
 });
-exports.updateFarmerSchema = exports.createFarmerSchema.partial().omit({ code: true });
+exports.updateFarmerSchema = exports.createFarmerSchema.partial();
 exports.farmerAdvanceSchema = zod_1.z.object({
     amount: zod_1.z.number().positive('Advance amount must be greater than 0'),
     notes: zod_1.z.string().optional(),

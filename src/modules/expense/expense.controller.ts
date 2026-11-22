@@ -48,4 +48,17 @@ export class ExpenseController {
       next(error);
     }
   }
+
+  static async updateExpense(req: Request, res: Response, next: NextFunction) {
+    try {
+      const expense = await ExpenseService.updateExpense(req.params.id, req.body);
+      return sendResponse({
+        res,
+        message: 'Expense record updated',
+        data: expense,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

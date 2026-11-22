@@ -129,5 +129,58 @@ class PurchaseService {
             return { ...purchase, lot };
         });
     }
+    static async update(id, input) {
+        const existing = await this.getById(id);
+        return database_1.prisma.$transaction(async (tx) => {
+            const grossWeight = input.grossWeightKg ?? Number(existing.grossWeightKg);
+            const tareWeight = input.sackTareWeightKg ?? Number(existing.sackTareWeightKg);
+            const netWeight = (0, numberUtils_1.calculateNetWeight)(grossWeight, tareWeight);
+            const rate = input.rate ?? Number(existing.rate);
+            const rateUnit = input.rateUnit ?? existing.rateUnit;
+            const totalAmount = (0, numberUtils_1.calculatePurchaseAmount)(netWeight, rate, rateUnit);
+            const updated = await tx.paddyPurchase.update({
+                where: { id },
+                data: {
+                    variety: input.variety ?? existing.variety,
+                    fieldLocation: input.fieldLocation ?? existing.fieldLocation,
+                    sackCount: input.sackCount ?? existing.sackCount,
+                    grossWeightKg: grossWeight,
+                    sackTareWeightKg: tareWeight,
+                    netWeightKg: netWeight.toNumber(),
+                    rate,
+                    rateUnit,
+                    totalAmount: totalAmount.toNumber(),
+                    notes: input.notes !== undefined ? input.notes : existing.notes,
+                    purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : existing.purchaseDate,
+                },
+            });
+            // Update associated lot weight
+            const lot = await tx.paddyLot.findFirst({ where: { purchaseId: id } });
+            if (lot) {
+                const diff = netWeight.toNumber() - Number(lot.initialWeightKg);
+                await tx.paddyLot.update({
+                    where: { id: lot.id },
+                    data: {
+                        initialWeightKg: netWeight.toNumber(),
+                        remainingWeightKg: Math.max(0, Number(lot.remainingWeightKg) + diff),
+                    },
+                });
+            }
+            // Update corresponding ledger entry
+            const ledgerEntry = await tx.ledgerEntry.findFirst({
+                where: { referenceType: 'PURCHASE', referenceId: id },
+            });
+            if (ledgerEntry) {
+                await tx.ledgerEntry.update({
+                    where: { id: ledgerEntry.id },
+                    data: {
+                        amount: new client_1.Prisma.Decimal(totalAmount.toNumber()),
+                        description: `Paddy Purchase (${updated.sackCount} sacks, Net ${netWeight} kg @ NPR ${rate}/${rateUnit}) [Updated]`,
+                    },
+                });
+            }
+            return updated;
+        });
+    }
 }
 exports.PurchaseService = PurchaseService;

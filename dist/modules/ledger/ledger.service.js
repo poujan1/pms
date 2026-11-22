@@ -234,6 +234,9 @@ class LedgerService {
                     where: { chargeHandling: "FARMER_DEDUCTION" },
                     select: { totalCharge: true },
                 },
+                payments: {
+                    select: { amount: true },
+                },
             },
         });
         const summary = [];
@@ -248,6 +251,11 @@ class LedgerService {
             for (const a of f.advances) {
                 totalAdvancesNpr = totalAdvancesNpr.plus(a.amount.toString());
             }
+            let totalDirectPaymentsNpr = new decimal_js_1.Decimal(0);
+            for (const pay of f.payments) {
+                totalDirectPaymentsNpr = totalDirectPaymentsNpr.plus(pay.amount.toString());
+            }
+            const totalPaidNpr = totalDirectPaymentsNpr.plus(totalAdvancesNpr);
             let totalHarvesterCutsNpr = new decimal_js_1.Decimal(0);
             for (const h of f.harvesterJobs) {
                 totalHarvesterCutsNpr = totalHarvesterCutsNpr.plus(h.totalCharge.toString());
@@ -260,6 +268,17 @@ class LedgerService {
             const currentBalance = latestEntry
                 ? Number(latestEntry.balanceAfter)
                 : Number(f.openingBalance);
+            const remainingDueNpr = currentBalance > 0.01 ? currentBalance : 0;
+            let paymentStatus;
+            if (Math.abs(currentBalance) <= 0.01) {
+                paymentStatus = "CLEARED";
+            }
+            else if (currentBalance > 0.01) {
+                paymentStatus = totalPaidNpr.greaterThan(0) ? "PARTIAL" : "UNPAID";
+            }
+            else {
+                paymentStatus = "ADVANCE";
+            }
             summary.push({
                 farmerId: f.id,
                 code: f.code,
@@ -270,9 +289,12 @@ class LedgerService {
                 totalPurchasedKg: totalPaddyKg.toNumber(),
                 totalPurchasedAmountNpr: totalPaddyNpr.toNumber(),
                 totalAdvancesNpr: totalAdvancesNpr.toNumber(),
+                totalPaidNpr: totalPaidNpr.toNumber(),
+                remainingDueNpr,
                 totalHarvesterDeductionsNpr: totalHarvesterCutsNpr.toNumber(),
                 currentNetBalance: currentBalance,
                 status: currentBalance >= 0 ? "PAYABLE" : "ADVANCE_RECEIVABLE",
+                paymentStatus,
             });
         }
         return summary;

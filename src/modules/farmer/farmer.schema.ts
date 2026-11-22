@@ -9,7 +9,7 @@ export const createFarmerSchema = z.object({
   openingDate: z.string().datetime().optional(),
 });
 
-export const updateFarmerSchema = createFarmerSchema.partial().omit({ code: true });
+export const updateFarmerSchema = createFarmerSchema.partial();
 
 export const farmerAdvanceSchema = z.object({
   amount: z.number().positive('Advance amount must be greater than 0'),

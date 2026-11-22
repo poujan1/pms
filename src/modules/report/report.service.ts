@@ -1,5 +1,6 @@
 import { prisma } from '../../config/database';
 import { Decimal } from 'decimal.js';
+import { LedgerService } from '../ledger/ledger.service';
 
 export class ReportService {
   static async getDashboardSummary() {
@@ -73,15 +74,26 @@ export class ReportService {
     }
 
     // 6. Outstanding Farmer Liabilities & Mill Receivables
-    const farmers = await prisma.farmer.findMany({ select: { id: true } });
-    let totalFarmerLiabilityNpr = new Decimal(0);
-    for (const f of farmers) {
-      const lastEntry = await prisma.ledgerEntry.findFirst({
-        where: { partyType: 'FARMER', farmerId: f.id },
-        orderBy: { transactionDate: 'desc' },
-      });
-      if (lastEntry && new Decimal(lastEntry.balanceAfter.toString()).isPositive()) {
-        totalFarmerLiabilityNpr = totalFarmerLiabilityNpr.plus(lastEntry.balanceAfter.toString());
+    const farmersSummary = await LedgerService.getAllFarmersLedgerSummary();
+    let totalFarmerPurchasesNpr = new Decimal(0);
+    let totalFarmerPaidNpr = new Decimal(0);
+    let totalFarmerRemainingDueNpr = new Decimal(0);
+    let totalFarmerAdvancesNpr = new Decimal(0);
+    let clearedFarmersCount = 0;
+    let unpaidFarmersCount = 0;
+    let advanceFarmersCount = 0;
+
+    for (const f of farmersSummary) {
+      totalFarmerPurchasesNpr = totalFarmerPurchasesNpr.plus(f.totalPurchasedAmountNpr);
+      totalFarmerPaidNpr = totalFarmerPaidNpr.plus(f.totalPaidNpr);
+      if (f.paymentStatus === 'CLEARED') {
+        clearedFarmersCount++;
+      } else if (f.paymentStatus === 'ADVANCE') {
+        advanceFarmersCount++;
+        totalFarmerAdvancesNpr = totalFarmerAdvancesNpr.plus(Math.abs(f.currentNetBalance));
+      } else {
+        unpaidFarmersCount++;
+        totalFarmerRemainingDueNpr = totalFarmerRemainingDueNpr.plus(f.remainingDueNpr);
       }
     }
 
@@ -110,8 +122,18 @@ export class ReportService {
         totalMillRevenueNpr: totalMillSettlementNpr.toNumber(),
         totalOperatingExpensesNpr: totalOperatingExpensesNpr.toNumber(),
         totalDispatchExpensesNpr: totalDispatchExpensesNpr.toNumber(),
-        totalFarmerLiabilitiesNpr: totalFarmerLiabilityNpr.toNumber(),
+        totalFarmerLiabilitiesNpr: totalFarmerRemainingDueNpr.toNumber(),
         totalMillReceivablesNpr: totalMillReceivableNpr.toNumber(),
+      },
+      farmerPayments: {
+        totalFarmerPurchasesNpr: totalFarmerPurchasesNpr.toNumber(),
+        totalFarmerPaidNpr: totalFarmerPaidNpr.toNumber(),
+        totalFarmerRemainingDueNpr: totalFarmerRemainingDueNpr.toNumber(),
+        totalFarmerAdvancesNpr: totalFarmerAdvancesNpr.toNumber(),
+        clearedFarmersCount,
+        unpaidFarmersCount,
+        advanceFarmersCount,
+        totalFarmersCount: farmersSummary.length,
       },
     };
   }

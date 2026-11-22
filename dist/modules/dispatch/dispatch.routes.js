@@ -12,4 +12,5 @@ router.get('/', dispatch_controller_1.DispatchController.list);
 router.get('/available-lots', dispatch_controller_1.DispatchController.getAvailableLots);
 router.get('/:id', dispatch_controller_1.DispatchController.getById);
 router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER, client_1.Role.EMPLOYEE]), (0, validate_1.validateRequest)({ body: dispatch_schema_1.createDispatchSchema }), dispatch_controller_1.DispatchController.create);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: dispatch_schema_1.updateDispatchSchema }), dispatch_controller_1.DispatchController.update);
 exports.default = router;

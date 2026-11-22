@@ -50,5 +50,18 @@ class ExpenseController {
             next(error);
         }
     }
+    static async updateExpense(req, res, next) {
+        try {
+            const expense = await expense_service_1.ExpenseService.updateExpense(req.params.id, req.body);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Expense record updated',
+                data: expense,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.ExpenseController = ExpenseController;

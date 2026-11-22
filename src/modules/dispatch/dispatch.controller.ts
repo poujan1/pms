@@ -43,4 +43,17 @@ export class DispatchController {
       next(error);
     }
   }
+
+  static async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const dispatch = await DispatchService.update(req.params.id, req.body);
+      return sendResponse({
+        res,
+        message: 'Dispatch details updated successfully',
+        data: dispatch,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

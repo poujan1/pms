@@ -98,10 +98,55 @@ export class FarmerService {
   }
 
   static async update(id: string, input: UpdateFarmerInput) {
-    await this.getById(id);
-    return prisma.farmer.update({
-      where: { id },
-      data: input,
+    const existing = await this.getById(id);
+
+    if (input.code && input.code !== existing.code) {
+      const codeTaken = await prisma.farmer.findFirst({
+        where: { code: input.code, id: { not: id } },
+      });
+      if (codeTaken) {
+        throw new ConflictError(`Farmer code '${input.code}' is already assigned to another farmer.`);
+      }
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.farmer.update({
+        where: { id },
+        data: {
+          ...(input.code ? { code: input.code } : {}),
+          ...(input.name ? { name: input.name } : {}),
+          ...(input.phone ? { phone: input.phone } : {}),
+          ...(input.locality ? { locality: input.locality } : {}),
+          ...(input.openingBalance !== undefined
+            ? { openingBalance: new Prisma.Decimal(input.openingBalance) }
+            : {}),
+          ...(input.openingDate ? { openingDate: new Date(input.openingDate) } : {}),
+        },
+      });
+
+      // If opening balance was changed, update the initial ledger entry if present
+      if (input.openingBalance !== undefined) {
+        const openingLedger = await tx.ledgerEntry.findFirst({
+          where: {
+            partyType: 'FARMER',
+            farmerId: id,
+            description: 'Opening balance migration',
+          },
+        });
+
+        if (openingLedger) {
+          await tx.ledgerEntry.update({
+            where: { id: openingLedger.id },
+            data: {
+              entryType: input.openingBalance > 0 ? 'CREDIT' : 'DEBIT',
+              amount: new Prisma.Decimal(Math.abs(input.openingBalance)),
+              balanceAfter: new Prisma.Decimal(input.openingBalance),
+            },
+          });
+        }
+      }
+
+      return updated;
     });
   }
 

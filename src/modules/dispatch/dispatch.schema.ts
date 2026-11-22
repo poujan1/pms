@@ -23,4 +23,15 @@ export const createDispatchSchema = z.object({
   allocations: z.array(lotAllocationSchema).min(1, 'Must allocate at least one lot'),
 });
 
+export const updateDispatchSchema = z.object({
+  truckNumber: z.string().min(1).optional(),
+  driverName: z.string().min(1).optional(),
+  driverPhone: z.string().optional(),
+  transportCost: z.number().min(0).optional(),
+  loadingLaborCost: z.number().min(0).optional(),
+  otherExpenses: z.number().min(0).optional(),
+  notes: z.string().optional(),
+});
+
 export type CreateDispatchInput = z.infer<typeof createDispatchSchema>;
+export type UpdateDispatchInput = z.infer<typeof updateDispatchSchema>;

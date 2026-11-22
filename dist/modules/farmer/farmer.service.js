@@ -88,10 +88,50 @@ class FarmerService {
         });
     }
     static async update(id, input) {
-        await this.getById(id);
-        return database_1.prisma.farmer.update({
-            where: { id },
-            data: input,
+        const existing = await this.getById(id);
+        if (input.code && input.code !== existing.code) {
+            const codeTaken = await database_1.prisma.farmer.findFirst({
+                where: { code: input.code, id: { not: id } },
+            });
+            if (codeTaken) {
+                throw new appError_1.ConflictError(`Farmer code '${input.code}' is already assigned to another farmer.`);
+            }
+        }
+        return database_1.prisma.$transaction(async (tx) => {
+            const updated = await tx.farmer.update({
+                where: { id },
+                data: {
+                    ...(input.code ? { code: input.code } : {}),
+                    ...(input.name ? { name: input.name } : {}),
+                    ...(input.phone ? { phone: input.phone } : {}),
+                    ...(input.locality ? { locality: input.locality } : {}),
+                    ...(input.openingBalance !== undefined
+                        ? { openingBalance: new client_1.Prisma.Decimal(input.openingBalance) }
+                        : {}),
+                    ...(input.openingDate ? { openingDate: new Date(input.openingDate) } : {}),
+                },
+            });
+            // If opening balance was changed, update the initial ledger entry if present
+            if (input.openingBalance !== undefined) {
+                const openingLedger = await tx.ledgerEntry.findFirst({
+                    where: {
+                        partyType: 'FARMER',
+                        farmerId: id,
+                        description: 'Opening balance migration',
+                    },
+                });
+                if (openingLedger) {
+                    await tx.ledgerEntry.update({
+                        where: { id: openingLedger.id },
+                        data: {
+                            entryType: input.openingBalance > 0 ? 'CREDIT' : 'DEBIT',
+                            amount: new client_1.Prisma.Decimal(Math.abs(input.openingBalance)),
+                            balanceAfter: new client_1.Prisma.Decimal(input.openingBalance),
+                        },
+                    });
+                }
+            }
+            return updated;
         });
     }
     static async getLedger(farmerId, fromDate, toDate) {

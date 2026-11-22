@@ -12,4 +12,5 @@ router.get('/categories', expense_controller_1.ExpenseController.listCategories)
 router.post('/categories', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: expense_schema_1.createCategorySchema }), expense_controller_1.ExpenseController.createCategory);
 router.get('/', expense_controller_1.ExpenseController.listExpenses);
 router.post('/', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER, client_1.Role.EMPLOYEE]), (0, validate_1.validateRequest)({ body: expense_schema_1.createExpenseSchema }), expense_controller_1.ExpenseController.createExpense);
+router.put('/:id', (0, auth_1.authorize)([client_1.Role.OWNER, client_1.Role.MANAGER]), (0, validate_1.validateRequest)({ body: expense_schema_1.updateExpenseSchema }), expense_controller_1.ExpenseController.updateExpense);
 exports.default = router;

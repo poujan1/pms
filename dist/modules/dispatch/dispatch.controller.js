@@ -45,5 +45,18 @@ class DispatchController {
             next(error);
         }
     }
+    static async update(req, res, next) {
+        try {
+            const dispatch = await dispatch_service_1.DispatchService.update(req.params.id, req.body);
+            return (0, apiResponse_1.sendResponse)({
+                res,
+                message: 'Dispatch details updated successfully',
+                data: dispatch,
+            });
+        }
+        catch (error) {
+            next(error);
+        }
+    }
 }
 exports.DispatchController = DispatchController;
