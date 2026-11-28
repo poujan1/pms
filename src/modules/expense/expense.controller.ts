@@ -26,6 +26,15 @@ export class ExpenseController {
     }
   }
 
+  static async getExpenseSummary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const summary = await ExpenseService.getExpenseSummary(req.query);
+      return sendResponse({ res, data: summary });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async listExpenses(req: Request, res: Response, next: NextFunction) {
     try {
       const expenses = await ExpenseService.listExpenses(req.query);
@@ -54,8 +63,20 @@ export class ExpenseController {
       const expense = await ExpenseService.updateExpense(req.params.id, req.body);
       return sendResponse({
         res,
-        message: 'Expense record updated',
+        message: 'Expense record updated successfully',
         data: expense,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteExpense(req: Request, res: Response, next: NextFunction) {
+    try {
+      await ExpenseService.deleteExpense(req.params.id);
+      return sendResponse({
+        res,
+        message: 'Expense record deleted successfully',
       });
     } catch (error) {
       next(error);

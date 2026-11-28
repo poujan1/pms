@@ -9,6 +9,7 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/summary', ExpenseController.getExpenseSummary);
 router.get('/categories', ExpenseController.listCategories);
 router.post(
   '/categories',
@@ -27,9 +28,15 @@ router.post(
 
 router.put(
   '/:id',
-  authorize([Role.OWNER, Role.MANAGER]),
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
   validateRequest({ body: updateExpenseSchema }),
   ExpenseController.updateExpense
+);
+
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER]),
+  ExpenseController.deleteExpense
 );
 
 export default router;
