@@ -34,4 +34,10 @@ router.post(
   MillController.createContract
 );
 
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
+  MillController.delete
+);
+
 export default router;

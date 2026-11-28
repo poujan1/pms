@@ -72,4 +72,16 @@ export class MillController {
       next(error);
     }
   }
+
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await MillService.delete(req.params.id);
+      return sendResponse({
+        res,
+        message: 'Rice mill deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

@@ -22,9 +22,15 @@ router.post(
 
 router.put(
   '/:id',
-  authorize([Role.OWNER, Role.MANAGER]),
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
   validateRequest({ body: updateDispatchSchema }),
   DispatchController.update
+);
+
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
+  DispatchController.delete
 );
 
 export default router;

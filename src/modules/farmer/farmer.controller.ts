@@ -72,4 +72,16 @@ export class FarmerController {
       next(error);
     }
   }
+
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await FarmerService.delete(req.params.id);
+      return sendResponse({
+        res,
+        message: 'Farmer record deleted successfully',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

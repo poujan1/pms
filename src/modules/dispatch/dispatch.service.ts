@@ -160,7 +160,7 @@ export class DispatchService {
           dispatchDate: input.dispatchDate ? new Date(input.dispatchDate) : new Date(),
           truckNumber: input.truckNumber,
           driverName: input.driverName,
-          driverPhone: input.driverPhone,
+          driverPhone: input.driverPhone && input.driverPhone.trim().length > 0 ? input.driverPhone.trim() : null,
           totalSacks: input.totalSacks,
           grossWeightKg: input.grossWeightKg,
           tareWeightKg: input.tareWeightKg,
@@ -194,12 +194,67 @@ export class DispatchService {
       data: {
         ...(input.truckNumber ? { truckNumber: input.truckNumber } : {}),
         ...(input.driverName ? { driverName: input.driverName } : {}),
-        ...(input.driverPhone !== undefined ? { driverPhone: input.driverPhone } : {}),
+        ...(input.driverPhone !== undefined
+          ? { driverPhone: input.driverPhone && input.driverPhone.trim().length > 0 ? input.driverPhone.trim() : null }
+          : {}),
         ...(input.transportCost !== undefined ? { transportCost: input.transportCost } : {}),
         ...(input.loadingLaborCost !== undefined ? { loadingLaborCost: input.loadingLaborCost } : {}),
         ...(input.otherExpenses !== undefined ? { otherExpenses: input.otherExpenses } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
       },
+    });
+  }
+
+  static async delete(id: string) {
+    const dispatch = await prisma.truckDispatch.findUnique({
+      where: { id },
+      include: {
+        settlement: true,
+        allocations: {
+          include: { lot: true },
+        },
+      },
+    });
+
+    if (!dispatch) {
+      throw new NotFoundError('Truck dispatch record not found');
+    }
+
+    if (dispatch.settlement) {
+      throw new BadRequestError(
+        'Cannot delete dispatch because it has already been reconciled with the mill. Please remove the settlement first.',
+      );
+    }
+
+    return prisma.$transaction(async (tx) => {
+      // 1. Return allocated stock back to lots
+      for (const alloc of dispatch.allocations) {
+        const lot = await tx.paddyLot.findUnique({ where: { id: alloc.lotId } });
+        if (lot) {
+          const allocKg = new Decimal(alloc.allocatedKg.toString());
+          const newAllocated = new Decimal(lot.allocatedWeightKg.toString()).minus(allocKg);
+          const newRemaining = new Decimal(lot.remainingWeightKg.toString()).plus(allocKg);
+
+          await tx.paddyLot.update({
+            where: { id: lot.id },
+            data: {
+              allocatedWeightKg: Math.max(0, newAllocated.toNumber()),
+              remainingWeightKg: newRemaining.toNumber(),
+              isExhausted: false,
+            },
+          });
+        }
+      }
+
+      // 2. Delete allocations
+      await tx.dispatchAllocation.deleteMany({
+        where: { dispatchId: id },
+      });
+
+      // 3. Delete dispatch record
+      return tx.truckDispatch.delete({
+        where: { id },
+      });
     });
   }
 }

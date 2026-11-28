@@ -21,14 +21,14 @@ router.post(
 
 router.put(
   '/:id',
-  authorize([Role.OWNER, Role.MANAGER]),
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
   validateRequest({ body: updatePurchaseSchema }),
   PurchaseController.update
 );
 
 router.delete(
   '/:id',
-  authorize([Role.OWNER, Role.MANAGER]),
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
   PurchaseController.delete
 );
 

@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database';
 import { CreateFarmerInput, UpdateFarmerInput, FarmerAdvanceInput } from './farmer.schema';
-import { NotFoundError, ConflictError } from '../../utils/appError';
+import { NotFoundError, ConflictError, BadRequestError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
 import { LedgerService } from '../ledger/ledger.service';
 
@@ -232,6 +232,44 @@ export class FarmerService {
       await LedgerService.recalculateFarmerLedger(farmerId, tx);
 
       return advance;
+    });
+  }
+
+  static async delete(id: string) {
+    const farmer = await prisma.farmer.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            purchases: true,
+            advances: true,
+            payments: true,
+            harvesterJobs: true,
+          },
+        },
+      },
+    });
+
+    if (!farmer) {
+      throw new NotFoundError('Farmer not found');
+    }
+
+    if (
+      farmer._count.purchases > 0 ||
+      farmer._count.advances > 0 ||
+      farmer._count.payments > 0 ||
+      farmer._count.harvesterJobs > 0
+    ) {
+      throw new BadRequestError(
+        `Cannot delete farmer '${farmer.name}' because they have existing transaction records (${farmer._count.purchases} purchase(s), ${farmer._count.advances} advance(s), ${farmer._count.payments} payment(s), ${farmer._count.harvesterJobs} harvester job(s)). Please delete the linked transactions first.`,
+      );
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.ledgerEntry.deleteMany({
+        where: { partyType: 'FARMER', farmerId: id },
+      });
+      return tx.farmer.delete({ where: { id } });
     });
   }
 }

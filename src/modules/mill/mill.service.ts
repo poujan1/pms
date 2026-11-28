@@ -1,6 +1,6 @@
 import { prisma } from '../../config/database';
 import { CreateMillInput, UpdateMillInput, CreateContractInput } from './mill.schema';
-import { NotFoundError, ConflictError } from '../../utils/appError';
+import { NotFoundError, ConflictError, BadRequestError } from '../../utils/appError';
 import { Prisma } from '@prisma/client';
 import { LedgerService } from '../ledger/ledger.service';
 
@@ -202,5 +202,43 @@ export class MillService {
       currentReceivable: latestEntry ? latestEntry.balanceAfter : 0,
       entries,
     };
+  }
+
+  static async delete(id: string) {
+    const mill = await prisma.riceMill.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            dispatches: true,
+            settlements: true,
+            payments: true,
+            contracts: true,
+          },
+        },
+      },
+    });
+
+    if (!mill) {
+      throw new NotFoundError('Rice mill not found');
+    }
+
+    if (
+      mill._count.dispatches > 0 ||
+      mill._count.settlements > 0 ||
+      mill._count.payments > 0
+    ) {
+      throw new BadRequestError(
+        `Cannot delete rice mill '${mill.name}' because it has active records (${mill._count.dispatches} dispatch(es), ${mill._count.settlements} settlement(s), ${mill._count.payments} payment(s)). Please delete or adjust the dispatches first.`,
+      );
+    }
+
+    return prisma.$transaction(async (tx) => {
+      await tx.millContract.deleteMany({ where: { millId: id } });
+      await tx.ledgerEntry.deleteMany({
+        where: { partyType: 'RICE_MILL', millId: id },
+      });
+      return tx.riceMill.delete({ where: { id } });
+    });
   }
 }

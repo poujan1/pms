@@ -34,4 +34,10 @@ router.post(
   FarmerController.recordAdvance
 );
 
+router.delete(
+  '/:id',
+  authorize([Role.OWNER, Role.MANAGER, Role.EMPLOYEE]),
+  FarmerController.delete
+);
+
 export default router;

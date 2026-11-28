@@ -56,4 +56,16 @@ export class DispatchController {
       next(error);
     }
   }
+
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await DispatchService.delete(req.params.id);
+      return sendResponse({
+        res,
+        message: 'Truck dispatch deleted and warehouse lot stock released',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

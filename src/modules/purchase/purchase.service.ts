@@ -323,6 +323,10 @@ export class PurchaseService {
         await tx.paddyLot.delete({ where: { id: lot.id } });
       }
 
+      await tx.harvesterWork.deleteMany({
+        where: { purchaseId: id },
+      });
+
       await tx.ledgerEntry.deleteMany({
         where: { referenceType: 'PURCHASE', referenceId: id },
       });
